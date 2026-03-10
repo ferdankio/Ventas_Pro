@@ -4,209 +4,199 @@ const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const multer = require('multer');
+const Database = require('better-sqlite3');
 
-// Multer config: save uploads to public/uploads/
+// ==================== BASE DE DATOS SQLite ====================
+const dataDir = process.env.DATA_DIR || path.join(__dirname, 'data');
+if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+
+const db = new Database(path.join(dataDir, 'ventas.db'));
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS productos (
+    id TEXT PRIMARY KEY, nombre TEXT NOT NULL, descripcion TEXT DEFAULT '',
+    precio REAL DEFAULT 0, coste REAL DEFAULT 0, barcode TEXT DEFAULT '',
+    codigo TEXT DEFAULT '', sku TEXT DEFAULT '', categoria TEXT DEFAULT '',
+    unidad TEXT DEFAULT '', stock INTEGER DEFAULT 0, marca TEXT DEFAULT '',
+    tipo TEXT DEFAULT '', variante TEXT DEFAULT '',
+    cantidadDespachar INTEGER DEFAULT 0, cantidadDisponible INTEGER DEFAULT 0,
+    porRecibir INTEGER DEFAULT 0, imagen TEXT DEFAULT '',
+    creado TEXT DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS clientes (
+    id TEXT PRIMARY KEY, nombre TEXT NOT NULL, email TEXT DEFAULT '',
+    telefono TEXT DEFAULT '', telefono2 TEXT DEFAULT '', telefono3 TEXT DEFAULT '',
+    documento TEXT DEFAULT '', direccion TEXT DEFAULT '', nota TEXT DEFAULT '',
+    dia TEXT DEFAULT '', mes TEXT DEFAULT '', totalCompras REAL DEFAULT 0,
+    creado TEXT DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS pedidos (
+    id TEXT PRIMARY KEY, numero TEXT, tipo TEXT DEFAULT 'Pedido', fecha TEXT,
+    cliente TEXT DEFAULT '', clienteId TEXT DEFAULT '', estado TEXT DEFAULT 'Pendiente',
+    pago TEXT DEFAULT '', descuento REAL DEFAULT 0, iva INTEGER DEFAULT 0,
+    subtotal REAL DEFAULT 0, total REAL DEFAULT 0, observacion TEXT DEFAULT '',
+    items TEXT DEFAULT '[]', creado TEXT DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS servicios (
+    id TEXT PRIMARY KEY, nombre TEXT NOT NULL, descripcion TEXT DEFAULT '',
+    precio REAL DEFAULT 0, creado TEXT DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS ingresos (
+    id TEXT PRIMARY KEY, descripcion TEXT DEFAULT '', categoria TEXT DEFAULT 'Ventas',
+    monto REAL DEFAULT 0, fecha TEXT, creado TEXT DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS gastos (
+    id TEXT PRIMARY KEY, descripcion TEXT DEFAULT '', categoria TEXT DEFAULT 'Operaciones',
+    monto REAL DEFAULT 0, fecha TEXT, creado TEXT DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS contador (key TEXT PRIMARY KEY, value INTEGER DEFAULT 0);
+  INSERT OR IGNORE INTO contador (key, value) VALUES ('pedidos', 0);
+`);
+
+function nextPedidoNum() {
+  db.prepare("UPDATE contador SET value = value + 1 WHERE key = 'pedidos'").run();
+  const row = db.prepare("SELECT value FROM contador WHERE key = 'pedidos'").get();
+  return `PED-${String(row.value).padStart(4, '0')}`;
+}
+
+function rowToPedido(row) {
+  if (!row) return null;
+  try { row.items = JSON.parse(row.items || '[]'); } catch { row.items = []; }
+  row.iva = !!row.iva;
+  return row;
+}
+
+// ==================== MULTER ====================
 const uploadsDir = path.join(__dirname, 'public', 'uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadsDir),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, uuidv4() + ext);
-  }
+  filename: (req, file, cb) => cb(null, uuidv4() + path.extname(file.originalname))
 });
-const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) cb(null, true);
-    else cb(new Error('Solo se permiten imágenes'));
-  }
+const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => file.mimetype.startsWith('image/') ? cb(null, true) : cb(new Error('Solo imágenes'))
 });
 
+// ==================== EXPRESS ====================
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-// Middleware
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(session({
-  secret: 'proventasmagic-secret-2024',
-  resave: false,
-  saveUninitialized: true,
-  cookie: { secure: false }
-}));
+app.use(session({ secret: process.env.SESSION_SECRET || 'proventasmagic2024', resave: false, saveUninitialized: true }));
 
-// In-memory data store
-let db = {
-  productos: [
-    { id: uuidv4(), nombre: 'Laptop Pro 15"', precio: 1299.99, stock: 25, categoria: 'Electrónica' },
-    { id: uuidv4(), nombre: 'Mouse Inalámbrico', precio: 29.99, stock: 100, categoria: 'Accesorios' },
-    { id: uuidv4(), nombre: 'Teclado Mecánico', precio: 89.99, stock: 50, categoria: 'Accesorios' },
-    { id: uuidv4(), nombre: 'Monitor 27"', precio: 399.99, stock: 15, categoria: 'Electrónica' },
-    { id: uuidv4(), nombre: 'Auriculares BT', precio: 149.99, stock: 40, categoria: 'Audio' },
-  ],
-  clientes: [
-    { id: uuidv4(), nombre: 'María García', email: 'maria@email.com', telefono: '+56 9 1234 5678', totalCompras: 2450.00 },
-    { id: uuidv4(), nombre: 'Carlos López', email: 'carlos@email.com', telefono: '+56 9 8765 4321', totalCompras: 890.50 },
-    { id: uuidv4(), nombre: 'Ana Martínez', email: 'ana@email.com', telefono: '+56 9 5555 1234', totalCompras: 3200.00 },
-  ],
-  pedidos: [],
-  servicios: [
-    { id: uuidv4(), nombre: 'Instalación y Configuración', precio: 59.99, descripcion: 'Configuración completa de equipos' },
-    { id: uuidv4(), nombre: 'Soporte Técnico', precio: 39.99, descripcion: 'Soporte técnico por hora' },
-    { id: uuidv4(), nombre: 'Capacitación', precio: 99.99, descripcion: 'Capacitación en uso de software' },
-  ],
-  ingresos: [],
-  gastos: []
-};
-
-// ==================== API ROUTES ====================
-
-// Dashboard stats
+// Stats
 app.get('/api/stats', (req, res) => {
-  const totalIngresos = db.ingresos.reduce((sum, i) => sum + i.monto, 0);
-  const totalGastos = db.gastos.reduce((sum, g) => sum + g.monto, 0);
+  const totalIngresos = db.prepare('SELECT COALESCE(SUM(monto),0) as t FROM ingresos').get().t;
+  const totalGastos   = db.prepare('SELECT COALESCE(SUM(monto),0) as t FROM gastos').get().t;
   res.json({
-    totalPedidos: db.pedidos.length,
-    totalClientes: db.clientes.length,
-    totalProductos: db.productos.length,
-    totalIngresos,
-    totalGastos,
-    ganancia: totalIngresos - totalGastos,
-    pedidosRecientes: db.pedidos.slice(-5).reverse()
+    totalPedidos:   db.prepare('SELECT COUNT(*) as t FROM pedidos').get().t,
+    totalClientes:  db.prepare('SELECT COUNT(*) as t FROM clientes').get().t,
+    totalProductos: db.prepare('SELECT COUNT(*) as t FROM productos').get().t,
+    totalIngresos, totalGastos, ganancia: totalIngresos - totalGastos,
+    pedidosRecientes: db.prepare('SELECT * FROM pedidos ORDER BY creado DESC LIMIT 5').all().map(rowToPedido)
   });
 });
 
-// Upload imagen
 app.post('/api/upload', upload.single('imagen'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No se recibió imagen' });
   res.json({ url: '/uploads/' + req.file.filename });
 });
 
-// Productos
-app.get('/api/productos', (req, res) => res.json(db.productos));
+// PRODUCTOS
+app.get('/api/productos', (req, res) => res.json(db.prepare('SELECT * FROM productos ORDER BY nombre').all()));
 app.post('/api/productos', (req, res) => {
-  const producto = { id: uuidv4(), ...req.body };
-  db.productos.push(producto);
-  res.json(producto);
+  const id = uuidv4();
+  const p = { id, nombre:'', descripcion:'', precio:0, coste:0, barcode:'', codigo:'', sku:'', categoria:'', unidad:'', stock:0, marca:'', tipo:'', variante:'', cantidadDespachar:0, cantidadDisponible:0, porRecibir:0, imagen:'', ...req.body };
+  db.prepare(`INSERT INTO productos (id,nombre,descripcion,precio,coste,barcode,codigo,sku,categoria,unidad,stock,marca,tipo,variante,cantidadDespachar,cantidadDisponible,porRecibir,imagen) VALUES (@id,@nombre,@descripcion,@precio,@coste,@barcode,@codigo,@sku,@categoria,@unidad,@stock,@marca,@tipo,@variante,@cantidadDespachar,@cantidadDisponible,@porRecibir,@imagen)`).run(p);
+  res.json(db.prepare('SELECT * FROM productos WHERE id=?').get(id));
 });
 app.put('/api/productos/:id', (req, res) => {
-  const idx = db.productos.findIndex(p => p.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'No encontrado' });
-  db.productos[idx] = { ...db.productos[idx], ...req.body };
-  res.json(db.productos[idx]);
+  const ex = db.prepare('SELECT * FROM productos WHERE id=?').get(req.params.id);
+  if (!ex) return res.status(404).json({ error: 'No encontrado' });
+  const p = { ...ex, ...req.body, id: req.params.id };
+  db.prepare(`UPDATE productos SET nombre=@nombre,descripcion=@descripcion,precio=@precio,coste=@coste,barcode=@barcode,codigo=@codigo,sku=@sku,categoria=@categoria,unidad=@unidad,stock=@stock,marca=@marca,tipo=@tipo,variante=@variante,cantidadDespachar=@cantidadDespachar,cantidadDisponible=@cantidadDisponible,porRecibir=@porRecibir,imagen=@imagen WHERE id=@id`).run(p);
+  res.json(db.prepare('SELECT * FROM productos WHERE id=?').get(req.params.id));
 });
-app.delete('/api/productos/all', (req, res) => {
-  db.productos = [];
-  res.json({ success: true });
-});
-app.delete('/api/productos/:id', (req, res) => {
-  db.productos = db.productos.filter(p => p.id !== req.params.id);
-  res.json({ success: true });
-});
+app.delete('/api/productos/all', (req, res) => { db.prepare('DELETE FROM productos').run(); res.json({ success: true }); });
+app.delete('/api/productos/:id', (req, res) => { db.prepare('DELETE FROM productos WHERE id=?').run(req.params.id); res.json({ success: true }); });
 
-// Clientes
-app.get('/api/clientes', (req, res) => res.json(db.clientes));
+// CLIENTES
+app.get('/api/clientes', (req, res) => res.json(db.prepare('SELECT * FROM clientes ORDER BY nombre').all()));
 app.post('/api/clientes', (req, res) => {
-  const cliente = { id: uuidv4(), totalCompras: 0, ...req.body };
-  db.clientes.push(cliente);
-  res.json(cliente);
+  const id = uuidv4();
+  const c = { id, nombre:'', email:'', telefono:'', telefono2:'', telefono3:'', documento:'', direccion:'', nota:'', dia:'', mes:'', totalCompras:0, ...req.body };
+  db.prepare(`INSERT INTO clientes (id,nombre,email,telefono,telefono2,telefono3,documento,direccion,nota,dia,mes,totalCompras) VALUES (@id,@nombre,@email,@telefono,@telefono2,@telefono3,@documento,@direccion,@nota,@dia,@mes,@totalCompras)`).run(c);
+  res.json(db.prepare('SELECT * FROM clientes WHERE id=?').get(id));
 });
 app.put('/api/clientes/:id', (req, res) => {
-  const idx = db.clientes.findIndex(c => c.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'No encontrado' });
-  db.clientes[idx] = { ...db.clientes[idx], ...req.body };
-  res.json(db.clientes[idx]);
+  const ex = db.prepare('SELECT * FROM clientes WHERE id=?').get(req.params.id);
+  if (!ex) return res.status(404).json({ error: 'No encontrado' });
+  const c = { ...ex, ...req.body, id: req.params.id };
+  db.prepare(`UPDATE clientes SET nombre=@nombre,email=@email,telefono=@telefono,telefono2=@telefono2,telefono3=@telefono3,documento=@documento,direccion=@direccion,nota=@nota,dia=@dia,mes=@mes,totalCompras=@totalCompras WHERE id=@id`).run(c);
+  res.json(db.prepare('SELECT * FROM clientes WHERE id=?').get(req.params.id));
 });
-app.delete('/api/clientes/all', (req, res) => {
-  db.clientes = [];
-  res.json({ success: true });
-});
-app.delete('/api/clientes/:id', (req, res) => {
-  db.clientes = db.clientes.filter(c => c.id !== req.params.id);
-  res.json({ success: true });
-});
+app.delete('/api/clientes/all', (req, res) => { db.prepare('DELETE FROM clientes').run(); res.json({ success: true }); });
+app.delete('/api/clientes/:id', (req, res) => { db.prepare('DELETE FROM clientes WHERE id=?').run(req.params.id); res.json({ success: true }); });
 
-// Pedidos
-app.get('/api/pedidos', (req, res) => res.json(db.pedidos));
+// PEDIDOS
+app.get('/api/pedidos', (req, res) => res.json(db.prepare('SELECT * FROM pedidos ORDER BY creado DESC').all().map(rowToPedido)));
 app.post('/api/pedidos', (req, res) => {
-  const pedido = {
-    id: uuidv4(),
-    numero: `PED-${String(db.pedidos.length + 1).padStart(4, '0')}`,
-    fecha: new Date().toISOString().split('T')[0],
-    estado: 'Pendiente',
-    ...req.body
-  };
-  db.pedidos.push(pedido);
-  // Agregar ingreso automáticamente
-  db.ingresos.push({
-    id: uuidv4(),
-    descripcion: `Pedido ${pedido.numero}`,
-    monto: pedido.total || 0,
-    fecha: pedido.fecha,
-    categoria: 'Ventas'
-  });
-  res.json(pedido);
+  const id = uuidv4();
+  const numero = nextPedidoNum();
+  const fecha = new Date().toISOString().split('T')[0];
+  const p = { id, numero, fecha, tipo:'Pedido', cliente:'', clienteId:'', estado:'Pendiente', pago:'', descuento:0, iva:0, subtotal:0, total:0, observacion:'', items:'[]', ...req.body };
+  if (typeof p.items !== 'string') p.items = JSON.stringify(p.items || []);
+  if (typeof p.iva === 'boolean') p.iva = p.iva ? 1 : 0;
+  db.prepare(`INSERT INTO pedidos (id,numero,tipo,fecha,cliente,clienteId,estado,pago,descuento,iva,subtotal,total,observacion,items) VALUES (@id,@numero,@tipo,@fecha,@cliente,@clienteId,@estado,@pago,@descuento,@iva,@subtotal,@total,@observacion,@items)`).run(p);
+  db.prepare(`INSERT INTO ingresos (id,descripcion,monto,fecha,categoria) VALUES (?,?,?,?,'Ventas')`).run(uuidv4(), `Pedido ${numero}`, p.total || 0, fecha);
+  res.json(rowToPedido(db.prepare('SELECT * FROM pedidos WHERE id=?').get(id)));
 });
 app.put('/api/pedidos/:id', (req, res) => {
-  const idx = db.pedidos.findIndex(p => p.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'No encontrado' });
-  db.pedidos[idx] = { ...db.pedidos[idx], ...req.body };
-  res.json(db.pedidos[idx]);
+  const ex = db.prepare('SELECT * FROM pedidos WHERE id=?').get(req.params.id);
+  if (!ex) return res.status(404).json({ error: 'No encontrado' });
+  const p = { ...ex, ...req.body, id: req.params.id };
+  if (typeof p.items !== 'string') p.items = JSON.stringify(p.items || []);
+  if (typeof p.iva === 'boolean') p.iva = p.iva ? 1 : 0;
+  db.prepare(`UPDATE pedidos SET tipo=@tipo,fecha=@fecha,cliente=@cliente,clienteId=@clienteId,estado=@estado,pago=@pago,descuento=@descuento,iva=@iva,subtotal=@subtotal,total=@total,observacion=@observacion,items=@items WHERE id=@id`).run(p);
+  res.json(rowToPedido(db.prepare('SELECT * FROM pedidos WHERE id=?').get(req.params.id)));
 });
-app.delete('/api/pedidos/all', (req, res) => {
-  db.pedidos = [];
-  res.json({ success: true });
-});
-app.delete('/api/pedidos/:id', (req, res) => {
-  db.pedidos = db.pedidos.filter(p => p.id !== req.params.id);
-  res.json({ success: true });
-});
+app.delete('/api/pedidos/all', (req, res) => { db.prepare('DELETE FROM pedidos').run(); db.prepare("UPDATE contador SET value=0 WHERE key='pedidos'").run(); res.json({ success: true }); });
+app.delete('/api/pedidos/:id', (req, res) => { db.prepare('DELETE FROM pedidos WHERE id=?').run(req.params.id); res.json({ success: true }); });
 
-// Servicios
-app.get('/api/servicios', (req, res) => res.json(db.servicios));
+// SERVICIOS
+app.get('/api/servicios', (req, res) => res.json(db.prepare('SELECT * FROM servicios ORDER BY nombre').all()));
 app.post('/api/servicios', (req, res) => {
-  const servicio = { id: uuidv4(), ...req.body };
-  db.servicios.push(servicio);
-  res.json(servicio);
+  const id = uuidv4();
+  const s = { id, nombre:'', descripcion:'', precio:0, ...req.body };
+  db.prepare('INSERT INTO servicios (id,nombre,descripcion,precio) VALUES (@id,@nombre,@descripcion,@precio)').run(s);
+  res.json(db.prepare('SELECT * FROM servicios WHERE id=?').get(id));
 });
-app.delete('/api/servicios/:id', (req, res) => {
-  db.servicios = db.servicios.filter(s => s.id !== req.params.id);
-  res.json({ success: true });
-});
+app.delete('/api/servicios/:id', (req, res) => { db.prepare('DELETE FROM servicios WHERE id=?').run(req.params.id); res.json({ success: true }); });
 
-// Ingresos
-app.get('/api/ingresos', (req, res) => res.json(db.ingresos));
+// INGRESOS
+app.get('/api/ingresos', (req, res) => res.json(db.prepare('SELECT * FROM ingresos ORDER BY fecha DESC').all()));
 app.post('/api/ingresos', (req, res) => {
-  const ingreso = { id: uuidv4(), fecha: new Date().toISOString().split('T')[0], ...req.body };
-  db.ingresos.push(ingreso);
-  res.json(ingreso);
+  const id = uuidv4();
+  const i = { id, descripcion:'', categoria:'Ventas', monto:0, fecha: new Date().toISOString().split('T')[0], ...req.body };
+  db.prepare('INSERT INTO ingresos (id,descripcion,categoria,monto,fecha) VALUES (@id,@descripcion,@categoria,@monto,@fecha)').run(i);
+  res.json(db.prepare('SELECT * FROM ingresos WHERE id=?').get(id));
 });
-app.delete('/api/ingresos/:id', (req, res) => {
-  db.ingresos = db.ingresos.filter(i => i.id !== req.params.id);
-  res.json({ success: true });
-});
+app.delete('/api/ingresos/:id', (req, res) => { db.prepare('DELETE FROM ingresos WHERE id=?').run(req.params.id); res.json({ success: true }); });
 
-// Gastos
-app.get('/api/gastos', (req, res) => res.json(db.gastos));
+// GASTOS
+app.get('/api/gastos', (req, res) => res.json(db.prepare('SELECT * FROM gastos ORDER BY fecha DESC').all()));
 app.post('/api/gastos', (req, res) => {
-  const gasto = { id: uuidv4(), fecha: new Date().toISOString().split('T')[0], ...req.body };
-  db.gastos.push(gasto);
-  res.json(gasto);
+  const id = uuidv4();
+  const g = { id, descripcion:'', categoria:'Operaciones', monto:0, fecha: new Date().toISOString().split('T')[0], ...req.body };
+  db.prepare('INSERT INTO gastos (id,descripcion,categoria,monto,fecha) VALUES (@id,@descripcion,@categoria,@monto,@fecha)').run(g);
+  res.json(db.prepare('SELECT * FROM gastos WHERE id=?').get(id));
 });
-app.delete('/api/gastos/:id', (req, res) => {
-  db.gastos = db.gastos.filter(g => g.id !== req.params.id);
-  res.json({ success: true });
-});
+app.delete('/api/gastos/:id', (req, res) => { db.prepare('DELETE FROM gastos WHERE id=?').run(req.params.id); res.json({ success: true }); });
 
-// Serve frontend
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 app.listen(PORT, () => {
-  console.log(`\n🚀 Pro Ventas Magic corriendo en http://localhost:${PORT}\n`);
+  console.log(`\n🚀 Pro Ventas Magic en http://localhost:${PORT}`);
+  console.log(`📦 SQLite: ${path.join(dataDir, 'ventas.db')}\n`);
 });
