@@ -586,9 +586,8 @@ async function eliminarGasto(id) {
   showToast('Gasto eliminado');
 }
 
-
-let chartVentas = null, chartEstados = null, chartProductos = null;
-async function renderInformes() {
+// ==================== INFORMES ====================
+function renderInformes() {
   const totalIngresos = ingresos.reduce((s, i) => s + Number(i.monto), 0);
   const totalGastos = gastos.reduce((s, g) => s + Number(g.monto), 0);
   const ganancia = totalIngresos - totalGastos;
@@ -602,20 +601,6 @@ async function renderInformes() {
     <div class="stat-card"><div class="stat-icon">✅</div><div class="stat-label">Completados</div><div class="stat-value">${pedidos.filter(p=>p.estado==='Completado').length}</div></div>
     <div class="stat-card"><div class="stat-icon">⏳</div><div class="stat-label">Pendientes</div><div class="stat-value">${pedidos.filter(p=>p.estado==='Pendiente').length}</div></div>
   `;
-  try {
-    const ventas = await api('GET', '/informes/ventas-por-mes');
-    const estados = await api('GET', '/informes/pedidos-por-estado');
-    const prods = await api('GET', '/informes/top-productos');
-    if (chartVentas) chartVentas.destroy();
-    if (chartEstados) chartEstados.destroy();
-    if (chartProductos) chartProductos.destroy();
-    const cv = document.getElementById('chart-ventas');
-    const ce = document.getElementById('chart-estados');
-    const cp = document.getElementById('chart-productos');
-    if (cv && ventas.length) chartVentas = new Chart(cv, { type: 'bar', data: { labels: ventas.map(v => v.mes), datasets: [{ label: 'Ventas $', data: ventas.map(v => v.total||0), backgroundColor: '#3b5bdb', borderRadius: 8 }] }, options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } } });
-    if (ce && estados.length) chartEstados = new Chart(ce, { type: 'doughnut', data: { labels: estados.map(e => e.estado||'Sin estado'), datasets: [{ data: estados.map(e => e.cantidad), backgroundColor: ['#3b5bdb','#f97316','#10b981','#ef4444','#8b5cf6'] }] }, options: { responsive: true, plugins: { legend: { position: 'bottom' } } } });
-    if (cp && prods.length) chartProductos = new Chart(cp, { type: 'bar', data: { labels: prods.map(p => p.nombre), datasets: [{ label: 'Total $', data: prods.map(p => p.total||0), backgroundColor: '#f97316', borderRadius: 8 }] }, options: { responsive: true, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } } } });
-  } catch(e) { console.error('Charts error:', e); }
 }
 
 // ==================== CATÁLOGO ====================

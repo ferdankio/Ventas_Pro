@@ -9,7 +9,6 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/css/styles.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="/chart.js"></script>
 </head>
 <body>
   <div class="app">
@@ -626,20 +625,6 @@
           </div>
           <div class="subpage-body">
             <div class="stats-grid" id="stats-grid"></div>
-            <div style="padding:16px">
-              <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:16px">
-                <div style="font-weight:700;font-size:14px;margin-bottom:12px">Ventas por mes</div>
-                <canvas id="chart-ventas" height="200"></canvas>
-              </div>
-              <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:16px">
-                <div style="font-weight:700;font-size:14px;margin-bottom:12px">Pedidos por estado</div>
-                <canvas id="chart-estados" height="200"></canvas>
-              </div>
-              <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:16px">
-                <div style="font-weight:700;font-size:14px;margin-bottom:12px">Top 5 productos</div>
-                <canvas id="chart-productos" height="200"></canvas>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -735,24 +720,6 @@
               <div class="settings-row" onclick="navigate('importar-productos')">
                 <div class="settings-row-icon" style="background:#e8f0fe"><i class="fa-solid fa-file-arrow-up" style="color:#3b5bdb"></i></div>
                 <span class="settings-row-label">Importar Productos (Excel)</span>
-                <i class="fa-solid fa-chevron-right settings-arrow"></i>
-              </div>
-              <div class="settings-divider"></div>
-              <div class="settings-row" onclick="window.location.href='/api/exportar/clientes'">
-                <div class="settings-row-icon" style="background:#e8f8f0"><i class="fa-solid fa-file-arrow-down" style="color:#10b981"></i></div>
-                <span class="settings-row-label">Exportar Clientes (Excel)</span>
-                <i class="fa-solid fa-chevron-right settings-arrow"></i>
-              </div>
-              <div class="settings-divider"></div>
-              <div class="settings-row" onclick="window.location.href='/api/exportar/productos'">
-                <div class="settings-row-icon" style="background:#e8f8f0"><i class="fa-solid fa-file-arrow-down" style="color:#10b981"></i></div>
-                <span class="settings-row-label">Exportar Productos (Excel)</span>
-                <i class="fa-solid fa-chevron-right settings-arrow"></i>
-              </div>
-              <div class="settings-divider"></div>
-              <div class="settings-row" onclick="window.location.href='/api/exportar/pedidos'">
-                <div class="settings-row-icon" style="background:#e8f8f0"><i class="fa-solid fa-file-arrow-down" style="color:#10b981"></i></div>
-                <span class="settings-row-label">Exportar Pedidos (Excel)</span>
                 <i class="fa-solid fa-chevron-right settings-arrow"></i>
               </div>
               <div class="settings-divider"></div>
@@ -993,14 +960,12 @@
   <div class="modal-overlay" id="modal-pago-picker" onclick="closeModalOutside(event,'modal-pago-picker')">
     <div class="modal">
       <div class="modal-header"><h3>Forma de Pago</h3><button onclick="closeModal('modal-pago-picker')"><i class="fa-solid fa-xmark"></i></button></div>
-      <div class="item-list" style="max-height:400px;overflow-y:auto">
+      <div class="item-list">
         <div class="item-card" onclick="seleccionarPago('Efectivo')"><div class="item-info"><div class="item-name">&#x1F4B5; Efectivo</div></div></div>
         <div class="item-card" onclick="seleccionarPago('Transferencia')"><div class="item-info"><div class="item-name">&#x1F3E6; Transferencia</div></div></div>
         <div class="item-card" onclick="seleccionarPago('Tarjeta débito')"><div class="item-info"><div class="item-name">&#x1F4B3; Tarjeta débito</div></div></div>
         <div class="item-card" onclick="seleccionarPago('Tarjeta crédito')"><div class="item-info"><div class="item-name">&#x1F4B3; Tarjeta crédito</div></div></div>
         <div class="item-card" onclick="seleccionarPago('Cheque')"><div class="item-info"><div class="item-name">&#x1F4C4; Cheque</div></div></div>
-        <div class="item-card" onclick="seleccionarPago('Crédito (debe)')"><div class="item-info"><div class="item-name">&#x1F4CB; Crédito (debe)</div></div></div>
-        <div class="item-card" onclick="seleccionarPago('Cobra vendedor')"><div class="item-info"><div class="item-name">&#x1F9FE; Cobra vendedor</div></div></div>
       </div>
     </div>
   </div>

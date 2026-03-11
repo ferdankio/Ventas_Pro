@@ -5,6 +5,7 @@ const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const multer = require('multer');
 const Database = require('better-sqlite3');
+const setupAuth = require('./auth');
 
 // ==================== BASE DE DATOS SQLite ====================
 const dataDir = process.env.DATA_DIR || path.join(__dirname, 'data');
@@ -82,8 +83,33 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
 app.use(session({ secret: process.env.SESSION_SECRET || 'proventasmagic2024', resave: false, saveUninitialized: true }));
+setupAuth(app, db);
+
+// Informes
+app.get('/api/informes/resumen', (req, res) => {
+  const p = db.prepare('SELECT COUNT(*) as total, SUM(total) as monto FROM pedidos').get();
+  const c = db.prepare('SELECT COUNT(*) as total FROM clientes').get();
+  const pr = db.prepare('SELECT COUNT(*) as total FROM productos').get();
+  const ing = db.prepare('SELECT SUM(monto) as total FROM ingresos').get();
+  const gas = db.prepare('SELECT SUM(monto) as total FROM gastos').get();
+  res.json({ pedidos: p.total||0, ventasMonto: p.monto||0, clientes: c.total||0, productos: pr.total||0, ingresos: ing.total||0, gastos: gas.total||0 });
+});
+app.get('/api/informes/ventas-por-mes', (req, res) => {
+  const rows = db.prepare("SELECT strftime('%Y-%m', fecha) as mes, COUNT(*) as pedidos, SUM(total) as total FROM pedidos GROUP BY mes ORDER BY mes DESC LIMIT 12").all();
+  res.json(rows.reverse());
+});
+app.get('/api/informes/pedidos-por-estado', (req, res) => {
+  res.json(db.prepare('SELECT estado, COUNT(*) as cantidad FROM pedidos GROUP BY estado').all());
+});
+app.get('/api/informes/top-productos', (req, res) => {
+  const todos = db.prepare('SELECT items FROM pedidos').all();
+  const conteo = {};
+  todos.forEach(p => {
+    try { JSON.parse(p.items||'[]').forEach(it => { if (!conteo[it.nombre]) conteo[it.nombre]={nombre:it.nombre,cantidad:0,total:0}; conteo[it.nombre].cantidad+=(it.cantidad||1); conteo[it.nombre].total+=(it.precio||0)*(it.cantidad||1); }); } catch(e) {}
+  });
+  res.json(Object.values(conteo).sort((a,b)=>b.total-a.total).slice(0,5));
+});
 
 // Stats
 app.get('/api/stats', (req, res) => {
@@ -194,6 +220,74 @@ app.post('/api/gastos', (req, res) => {
 });
 app.delete('/api/gastos/:id', (req, res) => { db.prepare('DELETE FROM gastos WHERE id=?').run(req.params.id); res.json({ success: true }); });
 
+
+// Exportar Excel
+app.get('/api/exportar/clientes', async (req, res) => {
+  const ExcelJS = require('exceljs');
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Clientes');
+  ws.columns = [
+    { header: 'Nombre', key: 'nombre', width: 30 },
+    { header: 'Telefono', key: 'telefono', width: 15 },
+    { header: 'Email', key: 'email', width: 25 },
+    { header: 'Direccion', key: 'direccion', width: 30 },
+    { header: 'Documento', key: 'documento', width: 15 },
+    { header: 'Nota', key: 'nota', width: 30 },
+  ];
+  ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF3B5BDB' } };
+  db.prepare('SELECT * FROM clientes ORDER BY nombre').all().forEach(c => ws.addRow(c));
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename=Clientes.xlsx');
+  await wb.xlsx.write(res);
+  res.end();
+});
+
+app.get('/api/exportar/productos', async (req, res) => {
+  const ExcelJS = require('exceljs');
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Productos');
+  ws.columns = [
+    { header: 'Nombre', key: 'nombre', width: 30 },
+    { header: 'Precio', key: 'precio', width: 12 },
+    { header: 'Stock', key: 'stock', width: 10 },
+    { header: 'SKU', key: 'sku', width: 15 },
+    { header: 'Marca', key: 'marca', width: 15 },
+    { header: 'Tipo', key: 'tipo', width: 15 },
+    { header: 'Variante', key: 'variante', width: 15 },
+  ];
+  ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF97316' } };
+  db.prepare('SELECT * FROM productos ORDER BY nombre').all().forEach(p => ws.addRow(p));
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename=Productos.xlsx');
+  await wb.xlsx.write(res);
+  res.end();
+});
+
+app.get('/api/exportar/pedidos', async (req, res) => {
+  const ExcelJS = require('exceljs');
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Pedidos');
+  ws.columns = [
+    { header: 'Numero', key: 'numero', width: 10 },
+    { header: 'Cliente', key: 'cliente', width: 25 },
+    { header: 'Fecha', key: 'fecha', width: 12 },
+    { header: 'Estado', key: 'estado', width: 12 },
+    { header: 'Total', key: 'total', width: 12 },
+    { header: 'Pago', key: 'pago', width: 15 },
+    { header: 'Observacion', key: 'observacion', width: 30 },
+  ];
+  ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF10B981' } };
+  db.prepare('SELECT numero,cliente,fecha,estado,total,pago,observacion FROM pedidos ORDER BY numero DESC').all().forEach(p => ws.addRow(p));
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename=Pedidos.xlsx');
+  await wb.xlsx.write(res);
+  res.end();
+});
+
+app.use(express.static(path.join(__dirname, 'public')));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 app.listen(PORT, () => {
