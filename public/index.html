@@ -716,6 +716,34 @@
               </div>
             </div>
 
+            <!-- MI NEGOCIO -->
+            <div class="settings-section-label">MI NEGOCIO</div>
+            <div class="settings-group">
+              <div class="settings-row" onclick="navigate('mi-negocio')">
+                <div class="settings-row-icon" style="background:#e8f0fe"><i class="fa-solid fa-building" style="color:#3b5bdb"></i></div>
+                <span class="settings-row-label">Datos comerciales</span>
+                <i class="fa-solid fa-chevron-right settings-arrow"></i>
+              </div>
+              <div class="settings-divider"></div>
+              <div class="settings-row" onclick="navigate('mi-direccion')">
+                <div class="settings-row-icon" style="background:#e8f0fe"><i class="fa-solid fa-location-dot" style="color:#3b5bdb"></i></div>
+                <span class="settings-row-label">Dirección</span>
+                <i class="fa-solid fa-chevron-right settings-arrow"></i>
+              </div>
+              <div class="settings-divider"></div>
+              <div class="settings-row" onclick="navigate('mi-logo')">
+                <div class="settings-row-icon" style="background:#fef9e7"><i class="fa-solid fa-image" style="color:#f59e0b"></i></div>
+                <span class="settings-row-label">Logo</span>
+                <i class="fa-solid fa-chevron-right settings-arrow"></i>
+              </div>
+              <div class="settings-divider"></div>
+              <div class="settings-row" onclick="navigate('mi-firma')">
+                <div class="settings-row-icon" style="background:#e6f9f0"><i class="fa-solid fa-signature" style="color:#10b981"></i></div>
+                <span class="settings-row-label">Firma</span>
+                <i class="fa-solid fa-chevron-right settings-arrow"></i>
+              </div>
+            </div>
+
             <!-- CUENTA -->
             <div class="settings-section-label">CUENTA</div>
             <div class="settings-group">
@@ -815,7 +843,7 @@
               <div class="settings-row">
                 <div class="settings-row-icon" style="background:#f1f5f9"><i class="fa-solid fa-mobile-screen" style="color:#64748b"></i></div>
                 <span class="settings-row-label">Versión de la app</span>
-                <span class="settings-row-value">1.0.4</span>
+                <span class="settings-row-value">2.0.0</span>
                 <i class="fa-solid fa-chevron-right settings-arrow"></i>
               </div>
               <div class="settings-divider"></div>
@@ -834,6 +862,71 @@
               </div>
             </div>
 
+          </div>
+        </div>
+
+        <!-- MI NEGOCIO - DATOS COMERCIALES -->
+        <div class="page" id="page-mi-negocio">
+          <div class="subpage-header">
+            <button class="back-btn" onclick="navigate('ajustes')"><i class="fa-solid fa-arrow-left"></i></button>
+            <h2>Datos comerciales</h2>
+          </div>
+          <div class="subpage-body" style="padding:16px">
+            <div class="form-field-group"><label>Nombre empresa</label><input type="text" id="neg-nombre" placeholder="Nombre de tu empresa"></div>
+            <div class="form-field-group"><label>RUT</label><input type="text" id="neg-rut" placeholder="76.000.000-0"></div>
+            <div class="form-field-group"><label>Teléfono</label><input type="text" id="neg-telefono" placeholder="+56 9 0000 0000"></div>
+            <div class="form-field-group"><label>E-mail</label><input type="email" id="neg-email" placeholder="correo@empresa.cl"></div>
+            <div class="form-field-group"><label>WhatsApp</label><input type="text" id="neg-whatsapp" placeholder="+56 9 0000 0000"></div>
+            <div class="form-field-group"><label>Instagram</label><input type="text" id="neg-instagram" placeholder="@tuempresa"></div>
+            <div class="form-field-group"><label>Sitio web</label><input type="text" id="neg-web" placeholder="www.tuempresa.cl"></div>
+            <button class="btn-primary" style="width:100%;margin-top:12px" onclick="guardarNegocio()">Actualizar</button>
+          </div>
+        </div>
+
+        <!-- MI NEGOCIO - DIRECCIÓN -->
+        <div class="page" id="page-mi-direccion">
+          <div class="subpage-header">
+            <button class="back-btn" onclick="navigate('ajustes')"><i class="fa-solid fa-arrow-left"></i></button>
+            <h2>Dirección</h2>
+          </div>
+          <div class="subpage-body" style="padding:16px">
+            <div class="form-field-group"><label>Dirección</label><input type="text" id="neg-direccion" placeholder="Av. Ejemplo 1234"></div>
+            <div class="form-field-group"><label>Ciudad</label><input type="text" id="neg-ciudad" placeholder="Santiago"></div>
+            <div class="form-field-group"><label>Región</label><input type="text" id="neg-region" placeholder="Región Metropolitana"></div>
+            <div class="form-field-group"><label>País</label><input type="text" id="neg-pais" placeholder="Chile"></div>
+            <button class="btn-primary" style="width:100%;margin-top:12px" onclick="guardarDireccion()">Actualizar</button>
+          </div>
+        </div>
+
+        <!-- MI NEGOCIO - LOGO -->
+        <div class="page" id="page-mi-logo">
+          <div class="subpage-header">
+            <button class="back-btn" onclick="navigate('ajustes')"><i class="fa-solid fa-arrow-left"></i></button>
+            <h2>Logo</h2>
+          </div>
+          <div class="subpage-body" style="padding:16px;text-align:center">
+            <div id="logo-preview" style="margin:16px auto;width:180px;height:120px;border:2px dashed #ccc;border-radius:12px;display:flex;align-items:center;justify-content:center;overflow:hidden">
+              <i class="fa-solid fa-image" style="font-size:48px;color:#ccc"></i>
+            </div>
+            <input type="file" id="logo-file" accept="image/*" style="display:none" onchange="previewLogo(this)">
+            <button class="btn-primary" style="width:100%;margin-top:12px" onclick="document.getElementById('logo-file').click()">Seleccionar imagen</button>
+            <button class="btn-primary" style="width:100%;margin-top:8px;background:#10b981" onclick="subirLogo()">Guardar Logo</button>
+          </div>
+        </div>
+
+        <!-- MI NEGOCIO - FIRMA -->
+        <div class="page" id="page-mi-firma">
+          <div class="subpage-header">
+            <button class="back-btn" onclick="navigate('ajustes')"><i class="fa-solid fa-arrow-left"></i></button>
+            <h2>Firma</h2>
+          </div>
+          <div class="subpage-body" style="padding:16px;text-align:center">
+            <div id="firma-preview" style="margin:16px auto;width:180px;height:120px;border:2px dashed #ccc;border-radius:12px;display:flex;align-items:center;justify-content:center;overflow:hidden">
+              <i class="fa-solid fa-signature" style="font-size:48px;color:#ccc"></i>
+            </div>
+            <input type="file" id="firma-file" accept="image/*" style="display:none" onchange="previewFirma(this)">
+            <button class="btn-primary" style="width:100%;margin-top:12px" onclick="document.getElementById('firma-file').click()">Seleccionar imagen</button>
+            <button class="btn-primary" style="width:100%;margin-top:8px;background:#10b981" onclick="subirFirma()">Guardar Firma</button>
           </div>
         </div>
 

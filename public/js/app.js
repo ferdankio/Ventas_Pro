@@ -36,6 +36,7 @@ function navigate(page) {
   if (page === 'informes') renderInformes();
   if (page === 'catalogo') renderCatalogo();
   if (page === 'nuevo-pedido') initNuevoPedido();
+  if (page === 'mi-negocio' || page === 'mi-direccion' || page === 'mi-logo' || page === 'mi-firma') cargarNegocio();
 }
 
 function showPage(page) {
@@ -1701,4 +1702,97 @@ async function enviarCorreoPedido() {
     const r = await api('POST', '/pedidos/' + pedidoEditando.id + '/email', {});
     showToast('Correo enviado a ' + r.enviado_a, 'success');
   } catch(e) { showToast('Error: ' + e.message, 'error'); }
+}
+
+// ===== MI NEGOCIO =====
+async function cargarNegocio() {
+  try {
+    const r = await api('GET', '/config/negocio');
+    if (r) {
+      document.getElementById('neg-nombre').value = r.nombre || '';
+      document.getElementById('neg-rut').value = r.rut || '';
+      document.getElementById('neg-telefono').value = r.telefono || '';
+      document.getElementById('neg-email').value = r.email || '';
+      document.getElementById('neg-whatsapp').value = r.whatsapp || '';
+      document.getElementById('neg-instagram').value = r.instagram || '';
+      document.getElementById('neg-web').value = r.web || '';
+      document.getElementById('neg-direccion').value = r.direccion || '';
+      document.getElementById('neg-ciudad').value = r.ciudad || '';
+      document.getElementById('neg-region').value = r.region || '';
+      document.getElementById('neg-pais').value = r.pais || 'Chile';
+      if (r.logo) {
+        document.getElementById('logo-preview').innerHTML = '<img src="'+r.logo+'" style="max-width:100%;max-height:100%;object-fit:contain">';
+      }
+      if (r.firma) {
+        document.getElementById('firma-preview').innerHTML = '<img src="'+r.firma+'" style="max-width:100%;max-height:100%;object-fit:contain">';
+      }
+    }
+  } catch(e) {}
+}
+
+async function guardarNegocio() {
+  const data = {
+    nombre: document.getElementById('neg-nombre').value,
+    rut: document.getElementById('neg-rut').value,
+    telefono: document.getElementById('neg-telefono').value,
+    email: document.getElementById('neg-email').value,
+    whatsapp: document.getElementById('neg-whatsapp').value,
+    instagram: document.getElementById('neg-instagram').value,
+    web: document.getElementById('neg-web').value
+  };
+  await api('POST', '/config/negocio', data);
+  showToast('Datos guardados', 'success');
+}
+
+async function guardarDireccion() {
+  const data = {
+    direccion: document.getElementById('neg-direccion').value,
+    ciudad: document.getElementById('neg-ciudad').value,
+    region: document.getElementById('neg-region').value,
+    pais: document.getElementById('neg-pais').value
+  };
+  await api('POST', '/config/negocio', data);
+  showToast('Dirección guardada', 'success');
+}
+
+function previewLogo(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('logo-preview').innerHTML = '<img src="'+e.target.result+'" style="max-width:100%;max-height:100%;object-fit:contain">';
+  };
+  reader.readAsDataURL(file);
+}
+
+function previewFirma(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('firma-preview').innerHTML = '<img src="'+e.target.result+'" style="max-width:100%;max-height:100%;object-fit:contain">';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function subirLogo() {
+  const file = document.getElementById('logo-file').files[0];
+  if (!file) return showToast('Selecciona una imagen', 'error');
+  const reader = new FileReader();
+  reader.onload = async e => {
+    await api('POST', '/config/negocio', { logo: e.target.result });
+    showToast('Logo guardado', 'success');
+  };
+  reader.readAsDataURL(file);
+}
+
+async function subirFirma() {
+  const file = document.getElementById('firma-file').files[0];
+  if (!file) return showToast('Selecciona una imagen', 'error');
+  const reader = new FileReader();
+  reader.onload = async e => {
+    await api('POST', '/config/negocio', { firma: e.target.result });
+    showToast('Firma guardada', 'success');
+  };
+  reader.readAsDataURL(file);
 }

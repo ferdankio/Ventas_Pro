@@ -718,3 +718,18 @@ body { background: var(--bg); color: var(--text); min-height: 100vh; }
 .pedido-lista-dot {
   width: 12px; height: 12px; border-radius: 3px; display: inline-block;
 }
+
+/* Safe area para Android/iOS */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+}
+.bottom-nav {
+  padding-bottom: calc(8px + var(--sab)) !important;
+}
+.app-header {
+  padding-top: calc(12px + var(--sat)) !important;
+}
+.page {
+  padding-bottom: calc(60px + var(--sab));
+}

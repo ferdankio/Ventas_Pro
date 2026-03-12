@@ -53,6 +53,7 @@ db.exec(`
   );
   CREATE TABLE IF NOT EXISTS contador (key TEXT PRIMARY KEY, value INTEGER DEFAULT 0);
   INSERT OR IGNORE INTO contador (key, value) VALUES ('pedidos', 0);
+  CREATE TABLE IF NOT EXISTS config (clave TEXT PRIMARY KEY, valor TEXT);
 `);
 
 function nextPedidoNum() {
@@ -318,6 +319,29 @@ app.post('/api/pedidos/:id/email', async (req, res) => {
     });
     res.json({ success: true, enviado_a: emailDestino });
   } catch(e) { console.error(e); res.status(500).json({ error: e.message }); }
+});
+
+
+// Config negocio
+app.get('/api/config/negocio', (req, res) => {
+  try {
+    const rows = db.prepare("SELECT clave, valor FROM config WHERE clave LIKE 'neg_%'").all();
+    const data = {};
+    rows.forEach(r => { data[r.clave.replace('neg_','')] = r.valor; });
+    res.json(data);
+  } catch(e) { res.json({}); }
+});
+
+app.post('/api/config/negocio', (req, res) => {
+  try {
+    const allowed = ['nombre','rut','telefono','email','whatsapp','instagram','web','direccion','ciudad','region','pais','logo','firma'];
+    for (const [k,v] of Object.entries(req.body)) {
+      if (allowed.includes(k)) {
+        db.prepare("INSERT OR REPLACE INTO config (clave, valor) VALUES (?, ?)").run('neg_'+k, v);
+      }
+    }
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
