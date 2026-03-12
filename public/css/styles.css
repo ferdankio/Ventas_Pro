@@ -1,11 +1,11 @@
 :root {
-  --bg: #dce6f5;
-  --bg2: #ffffff;
-  --bg3: #eef2fb;
-  --border: #d0d8ea;
-  --text: #1a1f36;
-  --text2: #8a93a8;
-  --accent: #3b5bdb;
+  --bg: #1a1f2e;
+  --bg2: #242938;
+  --bg3: #2e3447;
+  --border: #3a4158;
+  --text: #f1f3fa;
+  --text2: #8b92a9;
+  --accent: #e8441a;
   --orange: #f97316;
   --sidebar-w: 220px;
   --green: #10b981;
@@ -14,6 +14,10 @@
 [data-theme="dark"] {
   --bg: #0f1117; --bg2: #1a1d27; --bg3: #22263a;
   --border: #2e3347; --text: #f1f3fa; --text2: #8b92a9;
+}
+[data-theme="light"] {
+  --bg: #f0f4ff; --bg2: #ffffff; --bg3: #eef2fb;
+  --border: #d0d8ea; --text: #1a1f36; --text2: #8a93a8;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -435,7 +439,8 @@ body { background: var(--bg); color: var(--text); min-height: 100vh; }
   .main-content { margin-left: 0; }
   .topbar { display: flex; }
   .bottom-nav { display: flex; }
-  .page-content { padding: 14px 12px 100px; }
+  .page-content { padding: 14px 12px 120px; }
+  .subpage-body { padding-bottom: 120px !important; }
   .card-grid.three { gap: 8px; }
   .module-card { padding: 16px 8px; }
   .card-icon { width: 42px; height: 42px; }
@@ -732,4 +737,10 @@ body { background: var(--bg); color: var(--text); min-height: 100vh; }
 }
 .page {
   padding-bottom: calc(60px + var(--sab));
+}
+
+/* Safe area top para Android */
+.topbar {
+  padding-top: env(safe-area-inset-top, 0px) !important;
+  min-height: calc(52px + env(safe-area-inset-top, 0px)) !important;
 }

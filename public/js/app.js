@@ -676,7 +676,7 @@ function getIcon(categoria) {
 
 // ==================== INIT ====================
 async function init() {
-  setTheme(localStorage.getItem('theme') || 'light');
+  setTheme(localStorage.getItem('theme') || 'dark');
   const today = new Date().toISOString().split('T')[0];
   ['i-fecha','g-fecha'].forEach(id => { const el = document.getElementById(id); if(el) el.value = today; });
   await loadAll();
