@@ -1693,3 +1693,12 @@ async function limpiarProductos() {
   productos = [];
   showToast('Productos eliminados', 'success');
 }
+
+async function enviarCorreoPedido() {
+  if (!pedidoEditando) return showToast('Abre un pedido primero', 'error');
+  try {
+    showToast('Enviando...', 'success');
+    const r = await api('POST', '/pedidos/' + pedidoEditando.id + '/email', {});
+    showToast('Correo enviado a ' + r.enviado_a, 'success');
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+}

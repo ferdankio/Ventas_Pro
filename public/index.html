@@ -10,6 +10,12 @@
   <link rel="stylesheet" href="/css/styles.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="/chart.js"></script>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#3b5bdb">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="ProVentas">
+  <link rel="apple-touch-icon" href="/icon-192.png">
 </head>
 <body>
   <div class="app">
@@ -519,6 +525,9 @@
             <!-- Generar Documento -->
             <button class="btn-generar-doc" onclick="generarDocumento()">
               <i class="fa-solid fa-file-lines"></i> Generar Documento
+            </button>
+            <button class="btn-generar-doc" onclick="enviarCorreoPedido()" style="background:#10b981;margin-top:8px">
+              <i class="fa-solid fa-envelope"></i> Enviar por Correo
             </button>
 
             <!-- Fecha -->
@@ -1046,5 +1055,10 @@
 
   <div class="toast" id="toast"></div>
   <script src="/js/app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').then(() => console.log('SW registrado'));
+    }
+  </script>
 </body>
 </html>

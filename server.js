@@ -1,3 +1,4 @@
+require('dotenv').config({ path: '/mnt/ssd/proventas/app/.env' });
 const express = require('express');
 const session = require('express-session');
 const path = require('path');
@@ -285,6 +286,38 @@ app.get('/api/exportar/pedidos', async (req, res) => {
   res.setHeader('Content-Disposition', 'attachment; filename=Pedidos.xlsx');
   await wb.xlsx.write(res);
   res.end();
+});
+
+
+// Enviar pedido por correo
+app.post('/api/pedidos/:id/email', async (req, res) => {
+  try {
+    const nodemailer = require('nodemailer');
+    const pedido = db.prepare('SELECT * FROM pedidos WHERE id=?').get(req.params.id);
+    if (!pedido) return res.status(404).json({ error: 'Pedido no encontrado' });
+    try { pedido.items = JSON.parse(pedido.items||'[]'); } catch(e) { pedido.items=[]; }
+    pedido.iva = !!pedido.iva;
+    const clientes = db.prepare('SELECT * FROM clientes').all();
+    const cliente = clientes.find(c => c.nombre === pedido.cliente);
+    const configEmail = db.prepare("SELECT valor FROM config WHERE clave='email_respaldo'").get();
+    const emailDestino = configEmail ? configEmail.valor : null;
+    if (!emailDestino) return res.status(400).json({ error: 'No hay correo configurado en la app' });
+    const generarPDF = require('./pdf');
+    const pdf = await generarPDF(pedido, clientes);
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp-relay.brevo.com',
+      port: parseInt(process.env.SMTP_PORT) || 587,
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+    });
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM,
+      to: emailDestino,
+      subject: 'Pedido N° ' + pedido.numero + ' - Pro Ventas Magic',
+      html: '<p>Estimado/a <b>' + pedido.cliente + '</b>,</p><p>Adjuntamos su pedido N° <b>' + pedido.numero + '</b>.</p><p>Gracias por su preferencia.</p>',
+      attachments: [{ filename: 'Pedido_' + pedido.numero + '.pdf', content: pdf, contentType: 'application/pdf' }]
+    });
+    res.json({ success: true, enviado_a: emailDestino });
+  } catch(e) { console.error(e); res.status(500).json({ error: e.message }); }
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
